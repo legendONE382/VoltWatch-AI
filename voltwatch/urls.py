@@ -1,8 +1,8 @@
 from django.urls import path
 
-from monitoring.views import analyze_anomaly, dashboard
+from monitoring.views import dashboard, telemetry_proxy
 
 urlpatterns = [
     path("", dashboard, name="dashboard"),
-    path("api/analyze-anomaly/", analyze_anomaly, name="analyze_anomaly"),
+    path("api/telemetry/", telemetry_proxy, name="telemetry_proxy"),
 ]
