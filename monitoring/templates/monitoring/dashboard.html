@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoltWatch AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <header class="mb-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <h1 class="text-xl md:text-2xl font-semibold tracking-wide">VoltWatch AI: Autonomous Grid Infrastructure Monitor</h1>
+        <div class="flex items-center gap-3">
+          <span class="relative flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+          </span>
+          <span id="sim-status" class="text-emerald-400 font-medium">Simulation Active</span>
+          <button id="reset-btn" class="ml-4 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-sm font-medium">Clear Browser Cache / Reset Logs</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+        <h2 class="text-lg font-semibold mb-3">Live Grid Telemetry Stream</h2>
+        <div class="overflow-auto max-h-[70vh] rounded-lg border border-slate-800">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-800 text-slate-300 sticky top-0">
+              <tr>
+                <th class="p-2 text-left">Time (UTC)</th>
+                <th class="p-2 text-left">Location</th>
+                <th class="p-2 text-left">Voltage</th>
+                <th class="p-2 text-left">Current</th>
+                <th class="p-2 text-left">Temperature</th>
+                <th class="p-2 text-left">Status</th>
+              </tr>
+            </thead>
+            <tbody id="telemetry-body" class="divide-y divide-slate-800"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+        <h2 class="text-lg font-semibold mb-3">AI Autonomous Dispatch Center</h2>
+        <div id="dispatch-feed" class="space-y-3 max-h-[70vh] overflow-auto"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'voltwatch_logs_v1';
+    const locations = ['Alausa Zone 1', 'Ikeja Computer Village', 'Magboro Substation', 'Yaba Distribution Hub', 'Lekki Phase 1 Relay'];
+    let logs = [];
+
+    const telemetryBody = document.getElementById('telemetry-body');
+    const dispatchFeed = document.getElementById('dispatch-feed');
+    const resetBtn = document.getElementById('reset-btn');
+
+    const toFixed = (value, digits = 1) => Number(value).toFixed(digits);
+
+    function saveLogs() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+    }
+
+    function loadLogs() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        logs = raw ? JSON.parse(raw) : [];
+      } catch (error) {
+        logs = [];
+      }
+    }
+
+    function render() {
+      telemetryBody.innerHTML = '';
+      dispatchFeed.innerHTML = '';
+
+      const recent = [...logs].reverse();
+      recent.forEach((entry) => {
+        const tr = document.createElement('tr');
+        tr.className = entry.isAnomaly ? 'bg-rose-900/30 animate-pulse' : 'bg-transparent';
+        tr.innerHTML = `
+          <td class="p-2">${entry.timestamp}</td>
+          <td class="p-2">${entry.location}</td>
+          <td class="p-2">${toFixed(entry.voltage)} V</td>
+          <td class="p-2">${toFixed(entry.current)} A</td>
+          <td class="p-2">${toFixed(entry.temperature)} °C</td>
+          <td class="p-2 font-semibold ${entry.isAnomaly ? 'text-rose-400' : 'text-emerald-400'}">${entry.isAnomaly ? 'ANOMALY' : 'NORMAL'}</td>
+        `;
+        telemetryBody.appendChild(tr);
+
+        if (entry.dispatch) {
+          const card = document.createElement('article');
+          card.className = 'border border-amber-500/40 bg-amber-500/10 rounded-lg p-3';
+          card.innerHTML = `
+            <p class="text-xs text-amber-300 mb-1">${entry.timestamp} • ${entry.location}</p>
+            <p class="text-sm leading-relaxed whitespace-pre-wrap">${entry.dispatch}</p>
+          `;
+          dispatchFeed.appendChild(card);
+        }
+      });
+    }
+
+    function randomInRange(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    async function sendAnomalyForAnalysis(entry) {
+      try {
+        const response = await fetch('/api/analyze-anomaly/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: entry.location,
+            voltage: entry.voltage,
+            current: entry.current,
+            temperature: entry.temperature,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Analysis request failed');
+        }
+
+        entry.dispatch = data.dispatch;
+      } catch (error) {
+        entry.dispatch = `Dispatch unavailable: ${error.message}`;
+      }
+
+      saveLogs();
+      render();
+    }
+
+    async function simulationTick() {
+      const timestamp = new Date().toISOString();
+      const location = locations[Math.floor(Math.random() * locations.length)];
+      const voltage = randomInRange(212, 275);
+      const current = randomInRange(95, 380);
+      const temperature = randomInRange(58, 108);
+      const isAnomaly = temperature > 95 || voltage > 260;
+
+      const entry = {
+        timestamp,
+        location,
+        voltage,
+        current,
+        temperature,
+        isAnomaly,
+        dispatch: null,
+      };
+
+      logs.push(entry);
+      if (logs.length > 300) logs = logs.slice(-300);
+
+      saveLogs();
+      render();
+
+      if (isAnomaly) {
+        await sendAnomalyForAnalysis(entry);
+      }
+    }
+
+    resetBtn.addEventListener('click', () => {
+      localStorage.removeItem(STORAGE_KEY);
+      logs = [];
+      render();
+    });
+
+    loadLogs();
+    render();
+    simulationTick();
+    setInterval(simulationTick, 4000);
+  </script>
+</body>
+</html>
