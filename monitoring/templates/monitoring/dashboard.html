@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoltWatch AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <header class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <div class="flex flex-wrap justify-between gap-4 items-center">
+        <h1 class="text-xl md:text-2xl font-semibold">VoltWatch AI: Autonomous Grid Infrastructure Monitor</h1>
+        <button id="reset-btn" class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-sm font-medium">Clear Browser Cache / Reset Logs</button>
+      </div>
+    </header>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <article class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-slate-400 text-xs">Total Telemetry Logs</p><p id="kpi-total" class="text-3xl font-bold">0</p></article>
+      <article class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-slate-400 text-xs">Active Grid Anomalies</p><p id="kpi-anomalies" class="text-3xl font-bold text-rose-400">0</p></article>
+      <article class="rounded-xl bg-slate-900 border border-slate-800 p-4"><p class="text-slate-400 text-xs">AI Triage Rate</p><p id="kpi-triage" class="text-3xl font-bold text-emerald-400">100%</p></article>
+    </section>
+
+    <section class="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+      <h2 class="text-lg font-semibold mb-3">Lagos Grid Status Grid</h2>
+      <div id="status-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+    </section>
+
+    <section class="rounded-2xl bg-slate-900 border-2 border-cyan-500/50 p-4">
+      <h2 class="text-lg font-semibold mb-3">Judge Interaction Panel (Manual Incident Injector)</h2>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <select id="manual-location" class="md:col-span-1 rounded-lg bg-slate-950 border border-slate-700 p-2"></select>
+        <input id="manual-situation" class="md:col-span-2 rounded-lg bg-slate-950 border border-slate-700 p-2" placeholder="e.g., Transformer explosion due to lightning strike / Control room flooding" />
+        <button id="trigger-emergency" class="md:col-span-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 p-2 font-semibold">Trigger Emergency</button>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <article class="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+        <h3 class="font-semibold mb-3">Live Telemetry (Latest 10)</h3>
+        <div class="overflow-auto max-h-[60vh]">
+          <table class="w-full text-sm">
+            <thead><tr class="text-slate-300"><th class="p-2 text-left">Time</th><th class="p-2 text-left">Location</th><th class="p-2 text-left">Metrics</th><th class="p-2 text-left">Mode</th><th class="p-2 text-left">Status</th></tr></thead>
+            <tbody id="telemetry-body" class="divide-y divide-slate-800"></tbody>
+          </table>
+        </div>
+      </article>
+      <article class="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+        <h3 class="font-semibold mb-3">AI Autonomous Dispatch Control Center</h3>
+        <div id="dispatch-feed" class="space-y-3 max-h-[60vh] overflow-auto"></div>
+      </article>
+    </section>
+  </div>
+
+<script>
+const STORAGE_KEY = 'voltwatch_logs_v2';
+const API_URL = '/api/telemetry/';
+const LOCATIONS = [
+  'Alausa Substation',
+  'Ikeja Computer Village Hub',
+  'Magboro Transmission Substation',
+  'Yaba Distribution Center',
+];
+let logs = [];
+let apiHealth = {ok: 0, total: 0};
+
+const el = (id) => document.getElementById(id);
+
+function saveLogs(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(logs)); }
+function loadLogs(){ try{ logs = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { logs=[]; } }
+function fmt(n){ return Number(n).toFixed(1); }
+
+function updateKpis(){
+  const anomalies = logs.filter(l => l.is_anomaly).length;
+  el('kpi-total').textContent = logs.length;
+  el('kpi-anomalies').textContent = anomalies;
+  const rate = apiHealth.total === 0 ? 100 : Math.round((apiHealth.ok / apiHealth.total) * 100);
+  el('kpi-triage').textContent = `${rate}%`;
+}
+
+function renderStatusGrid(){
+  const box = el('status-grid'); box.innerHTML='';
+  LOCATIONS.forEach(loc => {
+    const latest = [...logs].reverse().find(x => x.location === loc);
+    const bad = latest && latest.is_anomaly;
+    const status = bad ? 'Anomaly' : 'Normal';
+    box.insertAdjacentHTML('beforeend', `
+      <div class="rounded-xl border ${bad ? 'border-rose-500/60 bg-rose-500/10' : 'border-emerald-500/50 bg-emerald-500/10'} p-3">
+        <p class="text-sm text-slate-300">${loc}</p>
+        <div class="mt-2 flex items-center gap-2">
+          <span class="inline-flex h-3 w-3 rounded-full ${bad ? 'bg-rose-400 animate-ping' : 'bg-emerald-400 animate-pulse'}"></span>
+          <span class="font-semibold ${bad ? 'text-rose-300' : 'text-emerald-300'}">${status}</span>
+        </div>
+      </div>`);
+  });
+}
+
+function renderTelemetry(){
+  const body = el('telemetry-body'); body.innerHTML='';
+  [...logs].reverse().slice(0,10).forEach(entry => {
+    const hot = entry.is_anomaly;
+    body.insertAdjacentHTML('beforeend', `
+      <tr class="${hot ? 'bg-rose-900/30' : ''}">
+        <td class="p-2">${entry.timestamp}</td>
+        <td class="p-2">${entry.location}</td>
+        <td class="p-2">${entry.situation ? entry.situation : `V ${fmt(entry.voltage)} / I ${fmt(entry.current)} / T ${fmt(entry.temperature)}°C`}</td>
+        <td class="p-2">${entry.mode}</td>
+        <td class="p-2 font-semibold ${hot ? 'text-rose-400' : 'text-emerald-400'}">${hot ? 'ANOMALY' : 'NORMAL'}</td>
+      </tr>`);
+  });
+}
+
+function speak(text){
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 1;
+  utter.pitch = 1;
+  window.speechSynthesis.speak(utter);
+}
+
+function renderDispatch(){
+  const feed = el('dispatch-feed'); feed.innerHTML='';
+  logs.filter(x => x.dispatch).slice().reverse().forEach((entry, idx) => {
+    feed.insertAdjacentHTML('beforeend', `
+      <div class="rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-3">
+        <p class="text-xs text-cyan-300 mb-2">${entry.timestamp} • ${entry.location} • ${entry.mode}</p>
+        <p class="text-sm whitespace-pre-wrap">${entry.dispatch}</p>
+        <button data-speech-id="${idx}" class="mt-3 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs">🔊 Read Dispatch Aloud</button>
+      </div>`);
+  });
+  feed.querySelectorAll('[data-speech-id]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const items = logs.filter(x => x.dispatch).slice().reverse();
+      const item = items[Number(btn.dataset.speechId)];
+      if (item) speak(item.dispatch);
+    });
+  });
+}
+
+function renderAll(){ updateKpis(); renderStatusGrid(); renderTelemetry(); renderDispatch(); }
+
+async function callProxy(payload){
+  apiHealth.total += 1;
+  try {
+    const res = await fetch(API_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Proxy failure');
+    apiHealth.ok += 1;
+    return data.dispatch;
+  } catch(err){
+    return `Dispatch unavailable: ${err.message}`;
+  }
+}
+
+async function simulationTick(){
+  const entry = {
+    timestamp: new Date().toISOString(),
+    location: LOCATIONS[Math.floor(Math.random()*LOCATIONS.length)],
+    voltage: 212 + Math.random()*63,
+    current: 95 + Math.random()*285,
+    temperature: 58 + Math.random()*50,
+    mode: 'automated',
+  };
+  entry.is_anomaly = entry.temperature > 95 || entry.voltage > 260;
+  if(entry.is_anomaly){
+    entry.dispatch = await callProxy({location: entry.location, voltage: entry.voltage, current: entry.current, temperature: entry.temperature});
+  }
+  logs.push(entry);
+  logs = logs.slice(-500);
+  saveLogs();
+  renderAll();
+}
+
+async function triggerEmergency(){
+  const button = el('trigger-emergency');
+  const location = el('manual-location').value;
+  const situation = el('manual-situation').value.trim();
+  if(!situation){ return; }
+  button.disabled = true;
+  button.classList.add('opacity-60', 'cursor-not-allowed');
+
+  const dispatch = await callProxy({location, situation});
+  const entry = {
+    timestamp: new Date().toISOString(),
+    location,
+    situation,
+    mode: 'manual-override',
+    is_anomaly: true,
+    dispatch,
+  };
+  logs.push(entry);
+  logs = logs.slice(-500);
+  saveLogs();
+  renderAll();
+
+  el('manual-situation').value = '';
+  button.disabled = false;
+  button.classList.remove('opacity-60', 'cursor-not-allowed');
+}
+
+function init(){
+  const select = el('manual-location');
+  select.innerHTML = LOCATIONS.map(l => `<option value="${l}">${l}</option>`).join('');
+  el('trigger-emergency').addEventListener('click', triggerEmergency);
+  el('reset-btn').addEventListener('click', () => { localStorage.removeItem(STORAGE_KEY); logs=[]; renderAll(); });
+  loadLogs();
+  renderAll();
+  simulationTick();
+  setInterval(simulationTick, 4000);
+}
+init();
+</script>
+</body>
+</html>
