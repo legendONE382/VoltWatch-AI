@@ -8,7 +8,7 @@ A stateless Django command-center application that simulates IoT electrical-tran
 
 ## Features
 
-- **Real-time telemetry simulation** (every 4 seconds) for Lagos grid locations.
+- **Real-time telemetry simulation** (every 10 seconds) for Lagos grid locations.
 - **Client-side anomaly detection** using thresholds:
   - Temperature > **95°C**
   - Voltage > **260V**
