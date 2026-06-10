@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VoltWatch AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
   <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -34,6 +35,38 @@
         <button id="trigger-emergency" class="md:col-span-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 p-2 font-semibold">Trigger Emergency</button>
       </div>
     </section>
+    <div class="consumer-help-section" style="margin-top: 25px; padding: 20px; background-color: #1e293b; border-radius: 8px; border: 1px solid #334155;">
+    <h3 style="color: #f8fafc; margin-bottom: 5px; font-size: 1.2rem;">⚡ Consumer Support Network</h3>
+    <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">Report localized consumer faults or directly reach certified emergency engineers.</p>
+    
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <button onclick="openProfessionalContact()" style="background-color: #ef4444; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+            🚨 Urgent: Contact Emergency Engineer
+        </button>
+        
+        <button onclick="toggleDirectory()" style="background-color: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-weight: 600; cursor: pointer;">
+            📋 View Certified District Engineers
+        </button>
+    </div>
+
+    <div id="professional-directory" style="display: none; margin-top: 15px; background: #0f172a; padding: 15px; border-radius: 6px;">
+        <h4 style="color: #38bdf8; margin-bottom: 10px; font-size: 1rem;">Available Hub Engineers (Lagos Grid)</h4>
+        <ul style="list-style: none; padding: 0; color: #cbd5e1; font-size: 0.9rem;">
+            <li style="padding: 8px 0; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between;">
+                <span>👷‍♂️ Engr. Tunde (Alausa District)</span>
+                <strong style="color: #4ade80;">● Online</strong>
+            </li>
+            <li style="padding: 8px 0; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between;">
+                <span><span>👷‍♂️ Engr. Chidi (Ikeja Hub)</span></span>
+                <strong style="color: #4ade80;">● Online</strong>
+            </li>
+            <li style="padding: 8px 0; display: flex; justify-content: space-between;">
+                <span>👷‍♂️ Engr. Biodun (Magboro Feed)</span>
+                <strong style="color: #fbbf24;">● On Field</strong>
+            </li>
+        </ul>
+    </div>
+</div>
 
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <article class="rounded-2xl bg-slate-900 border border-slate-800 p-4">
@@ -69,6 +102,27 @@ const el = (id) => document.getElementById(id);
 function saveLogs(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(logs)); }
 function loadLogs(){ try{ logs = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { logs=[]; } }
 function fmt(n){ return Number(n).toFixed(1); }
+
+// Toggle the local technician/professional list view
+function toggleDirectory() {
+    const directory = document.getElementById('professional-directory');
+    if (directory.style.display === 'none') {
+        directory.style.display = 'block';
+    } else {
+        directory.style.display = 'none';
+    }
+}
+
+// Trigger direct action for consumer emergency contact
+function openProfessionalContact() {
+    // We simulate dispatching a localized consumer notification
+    alert("VoltWatch Router: Connecting you to the nearest on-duty Alausa Grid Professional via instant fallback dispatch...");
+    
+    // Fallback: Open a direct communication channel (e.g., pre-filled WhatsApp link to a mock support desk)
+    const mockProfessionalPhone = "2348023062535"; // Using a placeholder structure
+    const message = encodeURIComponent("VoltWatch Consumer Alert: I need assistance regarding a localized utility fault in my zone.");
+    window.open(`https://wa.me/${mockProfessionalPhone}?text=${message}`, '_blank');
+}
 
 function updateKpis(){
   const anomalies = logs.filter(l => l.is_anomaly).length;
@@ -206,7 +260,7 @@ function init(){
   loadLogs();
   renderAll();
   simulationTick();
-  setInterval(simulationTick, 30000);
+  setInterval(simulationTick, 20000);
 }
 init();
 </script>
